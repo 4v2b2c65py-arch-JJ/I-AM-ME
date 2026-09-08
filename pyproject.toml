@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soe-ddci"
+version = "0.1.0"
+description = "Single Objective Entity + Dynamic Data Context Integration"
+requires-python = ">=3.9"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["soe_ddci*"]
+
+[tool.setuptools.package-data]
+soe_ddci = ["py.typed"]

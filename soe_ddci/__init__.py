@@ -24,6 +24,12 @@ from .canonical import (
 )
 from .formation import FormationStage, FormationResult
 from .rcs import RemainClusterSelector, RemainResult, ClusterItem
+from .brn import (
+    AttentionResult,
+    AttentionStatus,
+    BranchSeedMemory,
+    DeviceAttestation,
+)
 from .drc import (
     Checkpoint,
     DurableRecovery,
@@ -111,5 +117,9 @@ __all__ = [
     "JournalEntry",
     "RecoveryResult",
     "RecoveryStatus",
+    "AttentionResult",
+    "AttentionStatus",
+    "BranchSeedMemory",
+    "DeviceAttestation",
     "SOEDDCIEngine",
 ]

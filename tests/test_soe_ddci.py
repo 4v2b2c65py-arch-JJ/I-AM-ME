@@ -57,6 +57,10 @@ from soe_ddci import (
     verify_formation_authentic,
     verify_graph_consistent,
     verify_provenance,
+    AttentionResult,
+    AttentionStatus,
+    BranchSeedMemory,
+    DeviceAttestation,
 )
 
 def test_engine_process_cycle():
@@ -995,3 +999,129 @@ def test_recover_with_no_journal_after_checkpoint_is_clean():
     result = drc.recover()
     assert result.status in (RecoveryStatus.CLEAN, RecoveryStatus.RECOVERED)
     assert result.journal_entries_replayed == 0
+
+
+# ---------------------------------------------------------------------------
+# BRN-1: Branch Seed Memory Attention Layer
+# ---------------------------------------------------------------------------
+def test_register_seed_creates_entry():
+    g = LineageGraph()
+    g.add_root("r")
+    brn = BranchSeedMemory(g)
+    brn.register_seed("seed-1")
+    assert "seed-1" in brn.seeds()
+
+
+def test_register_device_attestation():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    att = DeviceAttestation(
+        device_id="macbook",
+        public_key_ref="key-macbook",
+        branch_seed="seed-1",
+        attestation="sig",
+    )
+    brn.register(att)
+    assert brn.devices_for_seed("seed-1")[0].device_id == "macbook"
+
+
+def test_attention_matched_device():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    brn.register(DeviceAttestation(
+        device_id="macbook", public_key_ref="key-macbook",
+        branch_seed="seed-1", attestation="sig",
+    ))
+    result = brn.attention("key-macbook", branch_seed="seed-1")
+    assert result.status is AttentionStatus.MATCHED
+    assert len(result.matched_devices) == 1
+
+
+def test_attention_unmatched_candidate():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    result = brn.attention("unknown-key", branch_seed="seed-1")
+    assert result.status is AttentionStatus.UNMATCHED
+
+
+def test_attention_no_seeds():
+    brn = BranchSeedMemory(LineageGraph())
+    result = brn.attention("any")
+    assert result.status is AttentionStatus.UNMATCHED
+
+
+def test_authorize_true_for_registered_device():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    brn.register(DeviceAttestation(
+        device_id="macbook", public_key_ref="key-macbook",
+        branch_seed="seed-1", attestation="sig",
+    ))
+    assert brn.authorize("seed-1", "key-macbook") is True
+    assert brn.authorize("seed-1", "key-iphone") is False
+
+
+def test_authorize_false_for_unknown_device():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    assert brn.authorize("seed-1", "nope") is False
+    assert brn.authorize("other-seed", "key-macbook") is False
+
+
+def test_device_attestation_expires():
+    att = DeviceAttestation(
+        device_id="d", public_key_ref="k", branch_seed="s",
+        attestation="sig", expires_at=1.0,
+    )
+    assert att.is_expired() is True
+    fresh = DeviceAttestation(
+        device_id="d", public_key_ref="k", branch_seed="s", attestation="sig",
+    )
+    assert fresh.is_expired() is False
+
+
+def test_prune_expired_removes_dead_entries():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    brn.register(DeviceAttestation(
+        device_id="dead", public_key_ref="dead-key", branch_seed="seed-1",
+        attestation="sig", expires_at=1.0,
+    ))
+    brn.register(DeviceAttestation(
+        device_id="alive", public_key_ref="alive-key", branch_seed="seed-1",
+        attestation="sig",
+    ))
+    removed = brn.prune_expired()
+    assert removed == 1
+    assert len(brn.devices_for_seed("seed-1")) == 1
+    assert brn.devices_for_seed("seed-1")[0].device_id == "alive"
+
+
+def test_attention_result_to_dict():
+    brn = BranchSeedMemory(LineageGraph())
+    brn.register_seed("seed-1")
+    brn.register(DeviceAttestation(
+        device_id="macbook", public_key_ref="key-macbook",
+        branch_seed="seed-1", attestation="sig",
+    ))
+    result = brn.attention("key-macbook", branch_seed="seed-1")
+    d = result.to_dict()
+    assert d["status"] == "matched"
+    assert d["branch_seed"] == "seed-1"
+
+
+def test_attention_status_values():
+    assert AttentionStatus.MATCHED.value == "matched"
+    assert AttentionStatus.UNMATCHED.value == "unmatched"
+    assert AttentionStatus.AMBIGUOUS.value == "ambiguous"
+    assert AttentionStatus.REJECTED.value == "rejected"
+
+
+def test_device_attestation_to_dict():
+    att = DeviceAttestation(
+        device_id="d", public_key_ref="k", branch_seed="s", attestation="sig",
+    )
+    d = att.to_dict()
+    assert d["device_id"] == "d"
+    assert d["public_key_ref"] == "k"
+    assert d["branch_seed"] == "s"

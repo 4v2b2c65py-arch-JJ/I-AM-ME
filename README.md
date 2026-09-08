@@ -35,6 +35,7 @@ recovery
 | LGC-1 | `soe_ddci/lgc.py` | Lineage graph, fork detection, explicit joins |
 | ATC-1 | `soe_ddci/atc.py` | Atomic transactions with snapshot/rollback |
 | DRC-1 | `soe_ddci/drc.py` | Durable checkpoint, journal, crash recovery |
+| BRN-1 | `soe_ddci/brn.py` | Branch seed memory attention, device registry |
 
 ## Durability contracts
 
@@ -50,6 +51,23 @@ H ∈ VisibleHeads  ⇒  H ∈ DurableHeads
 
 Every visible head carries a durable commit marker. A head cannot be exposed
 without a commit record reaching durable storage.
+
+## Device identity (BRN-1)
+
+The model decides what to produce. A hardware-bound device key decides whether
+a human-authorized device attests to it. The biometric authorizes key use;
+it is never the key itself.
+
+```
+I_root -> {K_A, K_B, K_C, ...}
+```
+
+Each device holds its own non-exportable key. The root identity maintains a
+signed device registry rather than copying private keys between machines.
+
+```
+Face ID -> authorize key use -> Sign_{K_device}
+```
 
 ## Identities
 
@@ -67,4 +85,4 @@ authenticity tag    authority over representation (HMAC, secret-backed)
 python3 run_tests.py
 ```
 
-90/90 passing.
+102/102 passing.
